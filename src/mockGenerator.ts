@@ -1,0 +1,171 @@
+import SwaggerParser from '@apidevtools/swagger-parser';
+import OpenAPISchemaValidator from 'openapi-schema-validator';
+
+import * as yaml from 'js-yaml';
+
+// Parse the input OpenAPI/Swagger spec and generate mock data
+export async function generateMockDataFromSwagger(spec: string): Promise<string> {
+    let parsedSpec: any;
+    
+    console.log('START Parsing Input Spec.');
+    console.debug('Input Spec:: ' + spec);
+
+    // Try to parse the spec as JSON or YAML
+    try {
+        if (spec.trim().startsWith('{')) {
+            parsedSpec = JSON.parse(spec); // JSON spec
+        } else {
+            parsedSpec = yaml.load(spec); // YAML spec
+        }
+    } catch (error: any) {
+        console.log('errors:: ' + error);
+        throw new Error("Invalid Swagger/OpenAPI specification: " + error.message);
+    }
+
+    console.log('END Parsing.');
+    console.debug('parsedSpec:: ' + JSON.stringify(parsedSpec));
+
+    try {
+        return generateMockDataForPaths(parsedSpec.paths);
+    } catch (error) {
+        const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+        console.error(`Error: ${errorMessage}`);
+        throw new Error(`Error parsing Swagger spec: ` + errorMessage);
+    }
+}
+
+// Generate mock data for all API paths
+function generateMockDataForPaths(paths: any): string {
+    let mockData: any = {};
+
+    for (const [path, methods] of Object.entries(paths)) {
+
+        // console.debug('path:: ' + JSON.stringify(path));
+        // console.debug('methods:: ' + JSON.stringify(methods));
+
+        mockData[path] = {};
+
+        // Assert 'methods' as a Record<string, any> to ensure it works with Object.entries
+        for (const [method, details] of Object.entries(methods as Record<string, any>)) {
+
+            // console.debug('details:: ' + JSON.stringify(details));
+
+            const hasRequestBody: boolean = details.requestBody ? true : false;
+            const hasResponses: boolean = details.responses ? true : false;
+
+            let mockRequestScenarios = null;
+            let mockResponseScenarios = null;
+
+            if ( hasRequestBody ) {
+                mockRequestScenarios = generateMockRequestScenarios(details.requestBody);
+            }
+
+            if ( hasResponses) {
+                mockResponseScenarios = generateMockResponseScenarios(details.responses);
+            }
+
+            const part1 = '<u>Scenario for status ';
+            const part2 =  '</u>';
+
+            mockData[path][method] = {
+                scenario1: {
+                   header: mockResponseScenarios && mockResponseScenarios[0] ? (part1 + mockResponseScenarios[0].status + part2) : null,
+                    request: mockRequestScenarios ? mockRequestScenarios : null,
+                    responses: mockResponseScenarios && mockResponseScenarios[0] ? mockResponseScenarios[0] : null,
+                },
+                scenario2: {
+                    header: mockResponseScenarios && mockResponseScenarios[1] ? (part1 + mockResponseScenarios[1].status + part2) : null,
+                    request: mockRequestScenarios ? mockRequestScenarios : null,
+                    responses: mockResponseScenarios && mockResponseScenarios[1] ? mockResponseScenarios[1] : null,
+                },
+                scenario3: {
+                    header: mockResponseScenarios && mockResponseScenarios[2] ? (part1 + mockResponseScenarios[2].status + part2) : null,
+                    request: mockRequestScenarios ? mockRequestScenarios : null,
+                    responses: mockResponseScenarios && mockResponseScenarios[2] ? mockResponseScenarios[2] : null,
+                }
+            };
+        }
+    }
+
+    console.log('generated mock data:: ' + JSON.stringify(mockData));
+
+    return mockData;
+}
+
+
+// Generate mock request data from the requestBody schema
+function generateMockRequestScenarios(requestBody: any): any {
+
+    // console.debug('requestBody.content:: ' + JSON.stringify(requestBody));
+
+    if (requestBody && requestBody.content) {
+        const contentTypes = Object.keys(requestBody.content);
+        const jsonSchema = requestBody.content[contentTypes[0]].schema;
+
+        var requestBodyMockData = generateMockData(jsonSchema);
+        // console.debug('requestBody MockData:: ' + JSON.stringify(requestBodyMockData));
+
+        return requestBodyMockData;
+    }
+    return null;
+}
+
+function generateMockData(schema: any): any {
+    if (!schema || !schema.type) { return null; };
+  
+    switch (schema.type) {
+      case 'string':
+        return schema.example || "example string";
+      case 'number':
+        return schema.example || 42.0;
+      case 'integer':
+        return schema.example || 42;
+      case 'boolean':
+        return schema.example || false;
+      case 'array':
+        if (schema.items) {
+          return [generateMockData(schema.items)];
+        }
+        return [];
+      case 'object':
+        const mockObject: { [key: string]: any } = {};
+        if (schema.properties) {
+          for (const key in schema.properties) {
+            if (schema.properties.hasOwnProperty(key)) {
+              mockObject[key] = generateMockData(schema.properties[key]);
+            }
+          }
+        }
+        return mockObject;
+      case 'null':
+        return null;
+      default:
+        return "unknown type";
+    }
+  }
+  
+// Generate mock response data for each response code
+function generateMockResponseScenarios(responses: Record<string, any>): any[] {
+    const scenarios = [];
+
+    for (const [statusCode, response] of Object.entries(responses || {})) {
+        // Assert that 'response' is of type `any` so we can access properties without errors
+        const content = (response as any)?.content?.['application/json']?.schema;
+
+        // Generate a mock response based on content schema or fallback
+        const mockResponse = content ? generateMockData(content) : { message: `Mock response for ${statusCode}` };
+
+        // Push three scenarios for each response
+        scenarios.push({
+            status: statusCode,
+            data: mockResponse
+        });
+    }
+
+    // Return three copies of the mock responses for each response code
+    return scenarios.length > 0 ? scenarios.slice(0, 3) : [{ status: "default", data: { message: "No responses available" } }];
+}
+
+
+
+  
