@@ -4,7 +4,7 @@
 
 The **API Response Mock Generator** is a Visual Studio Code extension designed to simplify API development. It takes OpenAPI/Swagger specifications (JSON or YAML format) as input and generates mock API response data. Ideal for developers and testers, this extension provides an easy way to prototype and test APIs.
 
-**Authors**: Suresh Nettur, Akhil Dusi and Unnati Nettur.
+**Author(s)**: Suresh Babu Nettur.
 
 ---
 
