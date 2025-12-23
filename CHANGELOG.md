@@ -7,9 +7,13 @@
 - Displays generated mock API response data in a dedicated output area.
 
 ### Version 1.0.1
-- No changes to the exetension
-- updated README and Package
+- updated README and Package.
 
 ### Version 1.0.2
-- No changes to the exetension
-- Added logo
+- Added logo.
+
+### Version 1.0.3
+- Updated logo, look and feel.
+
+### Version 1.0.4
+- Updated Readme and License.
